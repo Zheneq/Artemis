@@ -8,7 +8,7 @@ namespace RunServer
         static void Main(string[] args)
         {
             Console.WriteLine("Hello World!");
-            Process.Start(@"C:\Artemis\Win64\AtlasReactor.exe");
+            Process.Start(@"B:\Artemis\Win64\AtlasReactor.exe");
         }
     }
 }
