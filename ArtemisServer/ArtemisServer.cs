@@ -24,18 +24,35 @@ namespace Artemis
 
         public void Start()
         {
+            if (instance != null)
+            {
+                Log.Error("ArtemisServer::Start reentry!");
+                return;
+            }
+
             instance = this;
 
             Log.Info("Starting Server...");
             UIFrontendLoadingScreen.Get().StartDisplayError("Starting Server...");
+            //ConnectionConfig config = new ConnectionConfig();
+            //config.ConnectTimeout = 999999999;
+            //HostTopology hostTopology = new HostTopology(config, 16);
+            //NetworkServer.Configure(hostTopology);
             NetworkServer.useWebSockets = true;
             NetworkServer.Listen(Port);
 
             // Regiser Network Handlers
             GameMessageManager.RegisterAllHandlers();
 
+            Log.Info($"Streaming assets path {Application.streamingAssetsPath}");
+            Log.Info($"Persistent data path {Application.persistentDataPath}");
+            Log.Info($"Data path {Application.dataPath}");
             // Load map bundle
             AssetBundle MapsBundle = AssetBundle.LoadFromFile(Path.Combine(Application.dataPath, @"Bundles\scenes\maps.bundle"));
+            foreach (String scene in AssetBundleManager.Get().GetScenesInBundle("maps"))
+            {
+                Log.Info($"Available scene: {scene}");
+            }
 
             foreach (Scene sn in SceneManager.GetAllScenes()) {
                 Log.Info(sn.name);
@@ -158,6 +175,11 @@ namespace Artemis
             if (this.IsMapLoaded)
             {
                 Log.Error("Exiting on scene loaded, already loaded");
+                return;
+            }
+            if (scene.name != "VR_Practice")
+            {
+                Log.Error("Exiting on scene loaded, not VR_Practice");
                 return;
             }
             IsMapLoaded = true;
