@@ -38,9 +38,6 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
-    <Folder Include="GameServer\" />
-  </ItemGroup>
-  <ItemGroup>
     <Reference Include="Assembly-CSharp, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>B:\Artemis\Win64\AtlasReactor_Data\Managed\Assembly-CSharp.dll</HintPath>
