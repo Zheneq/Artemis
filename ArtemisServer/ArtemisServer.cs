@@ -33,6 +33,31 @@ namespace Artemis
 
             instance = this;
 
+            // TODO Look into state usage on server side
+            // Creating Teardown because GameFlowData checks if it isn't the current state, and null == null
+            //AppState_Startup.Create();
+            //AppState_Shutdown.Create();
+            ////AppState_LandingPage.Create();
+            ////AppState_FrontendLoadingScreen.Create();
+            ////AppState_GameTypeSelect.Create();
+            ////AppState_CharacterSelect.Create();
+            ////AppState_JoinGame.Create();
+            ////AppState_JoinGame.Create();
+            ////AppState_CreateGame.Create();
+            ////AppState_WaitingForGame.Create();
+            ////AppState_FoundGame.Create();
+            AppState_GameTeardown.Create();
+            ////AppState_FullScreenMovie.Create();
+            //AppState_InGameDecision.Create();
+            //AppState_InGameResolve.Create();
+            //AppState_InGameStarting.Create();
+            //AppState_InGameDeployment.Create();
+            //AppState_InGameEnding.Create();
+            //AppState_GameLoading.Create();
+            ////AppState_GroupCharacterSelect.Create();
+            ////AppState_RankModeDraft.Create();
+            ////AppState_LandingPage.Create();
+
             Log.Info("Starting Server...");
             UIFrontendLoadingScreen.Get().StartDisplayError("Starting Server...");
             //ConnectionConfig config = new ConnectionConfig();
@@ -220,6 +245,8 @@ namespace Artemis
                 }
             }
 
+            GameFlowData.Get().gameState = GameState.SpawningPlayers;
+
             bool destroyVisualsLoader = false;
             if (destroyVisualsLoader)
             {
@@ -241,8 +268,13 @@ namespace Artemis
                 AddCharacterActor(playerInfo);
             }
 
+            GameFlowData.Get().Networkm_currentTurn = 0;
+            GameFlowData.Get().gameState = GameState.StartingGame;
+
             // Show what objects are present in the current scene
             UnityUtils.DumpSceneObjects();
+
+            WebsocketManager.ReportGameReady(); // Not sure where exactly it is supposed to happen
         }
 
         public static ArtemisServer Get() { return instance; }
