@@ -181,11 +181,11 @@ namespace Artemis
                 Log.Error("Exiting on scene loaded, already loaded");
                 return;
             }
-            if (scene.name != "VR_Practice")
-            {
-                Log.Error("Exiting on scene loaded, not VR_Practice");
-                return;
-            }
+            //if (scene.name != "VR_Practice")
+            //{
+            //    Log.Error("Exiting on scene loaded, not VR_Practice");
+            //    return;
+            //}
             IsMapLoaded = true;
             InitializeGame(scene);
         }
