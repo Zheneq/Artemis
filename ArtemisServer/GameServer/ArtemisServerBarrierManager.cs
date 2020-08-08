@@ -29,6 +29,8 @@ namespace ArtemisServer.GameServer
                     BarrierManager.Get().RemoveBarrier(barrier);
                     SharedEffectBarrierManager.Get().EndBarrier(barrier.m_guid);
                 }
+                ArtemisServerResolutionManager.Get().ExpireBarriers(barriersToRemove);
+
                 BarrierManager.Get().CallRpcUpdateBarriers();
             }
         }

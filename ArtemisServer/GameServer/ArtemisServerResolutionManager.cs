@@ -16,6 +16,9 @@ namespace ArtemisServer.GameServer
         private List<ClientResolutionAction> Actions;
         private List<ActorAnimation> Animations;
         private List<Barrier> Barriers;
+
+        private Dictionary<int, AbilityData.ActionType> BarrierToAbility = new Dictionary<int, AbilityData.ActionType>();
+
         internal AbilityPriority Phase { get; private set; }
         internal Turn Turn;
 
@@ -156,6 +159,10 @@ namespace ArtemisServer.GameServer
                 Animations.AddRange(resolver.Animations);
                 Utils.Add(ref TargetedActorsThisPhase, resolver.TargetedActors);
                 Barriers.AddRange(resolver.Barriers);
+                foreach (Barrier barrier in resolver.Barriers)
+                {
+                    BarrierToAbility.Add(barrier.m_guid, ard.m_actionType);
+                }
             }
         }
 
@@ -279,6 +286,55 @@ namespace ArtemisServer.GameServer
                 target.SetTechPoints(target.TechPoints + energy);
                 Log.Info($" - {target.DisplayName}: deltaHP {deltaHP} ({target.HitPoints} total), deltaEnergy {energy} ({target.TechPoints} total)");
             }
+        }
+
+        public void ExpireBarriers(List<Barrier> barriers)
+        {
+            Log.Info($"Sending actions outside resolution");
+
+            // This all is based on Trap Wire! Other barriers might not need it at all!
+            List<ClientResolutionAction> actions = new List<ClientResolutionAction>();
+            foreach (Barrier barrier in barriers)
+            {
+
+                List<ServerClientUtils.SequenceStartData> seqStartList = new List<ServerClientUtils.SequenceStartData>()
+                {
+                    new ServerClientUtils.SequenceStartData(
+                        SequenceLookup.Get().GetPrefabOfSequenceId(5),  // TODO prefab id for Trap Wire removal, check for other barriers
+                        // Nix' Overwatch Drone doesn't seem to need this at all
+                        barrier.Caster.GetTravelBoardSquare(), // TODO ClientLastKnownPosSquare? The problem is, it's not updated as of now
+                        new ActorData[] { barrier.Caster },
+                        barrier.Caster,
+                        new SequenceSource(null, null, NextSeqSourceRootID, true))
+                };
+                BarrierToAbility.TryGetValue(barrier.m_guid, out var abilityAction);
+                ClientActorHitResults hitResults = new ClientActorHitResultsBuilder()
+                    .SetCanBeReactedTo(false)
+                    .Build();
+                ClientAbilityResults powerupResults = new ClientAbilityResults(
+                    barrier.Caster.ActorIndex,
+                    (int)abilityAction,
+                    new List<ServerClientUtils.SequenceStartData>(),
+                    new Dictionary<ActorData, ClientActorHitResults>() { { barrier.Caster, hitResults } },
+                    new Dictionary<Vector3, ClientPositionHitResults>());
+                ClientMovementResults movementResults = new ClientMovementResults(
+                        barrier.Caster,
+                        null,
+                        seqStartList,
+                        null,
+                        null,
+                        powerupResults,
+                        null);
+                ClientResolutionAction action = new ClientResolutionAction(ResolutionActionType.PowerupOnMove, null, null, movementResults);
+                Log.Info($"Sending action: {action.GetDebugDescription()}, Caster actor: {action.GetCaster()?.ActorIndex ?? -1}");
+                actions.Add(action);
+                break; // TODO just testing
+            }
+
+            SendToAll((short)MyMsgType.RunResolutionActionsOutsideResolve, new ResolutionActionsOutsideResolve()
+            {
+                Actions = actions
+            });
         }
 
         private void SendToAll(short msgType, MessageBase msg)
