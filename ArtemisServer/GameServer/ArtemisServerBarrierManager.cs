@@ -137,52 +137,20 @@ namespace ArtemisServer.GameServer
             int finalHealing = casterStats?.CalculateOutgoingHealForTargeter(response.m_healing) ?? response.m_healing;
             int techPointGainForCaster = 0;
             var payload = GetBarrierPayload(barrier);
-            if (payload != null && payload.GetTechPointsForCaster != null)
+            if (payload != null && payload.Ability != null)
             {
-                foreach (var tpi in payload.GetTechPointsForCaster(barrier))
-                {
-                    switch (tpi.m_type)
-                    {
-                        case TechPointInteractionType.RewardOnDamage_OncePerCast:
-                            if (finalDamage > 0 && payload.Hits == 1)
-                            {
-                                techPointGainForCaster += tpi.m_amount;
-                            }
-                            break;
-                        case TechPointInteractionType.RewardOnDamage_PerTarget:
-                            if (finalDamage > 0)
-                            {
-                                techPointGainForCaster += tpi.m_amount;
-                            }
-                            break;
-                        case TechPointInteractionType.RewardOnHit_OncePerCast:
-                            if (payload.Hits == 1)
-                            {
-                                techPointGainForCaster += tpi.m_amount;
-                            }
-                            break;
-                        case TechPointInteractionType.RewardOnHit_PerAllyTarget:
-                            if (barrier.Caster.GetTeam() == hitter.GetTeam())
-                            {
-                                techPointGainForCaster += tpi.m_amount;
-                            }
-                            break;
-                        case TechPointInteractionType.RewardOnHit_PerEnemyTarget:
-                            if (barrier.Caster.GetTeam() != hitter.GetTeam())
-                            {
-                                techPointGainForCaster += tpi.m_amount;
-                            }
-                            break;
-                        case TechPointInteractionType.RewardOnHit_PerTarget:
-                            techPointGainForCaster += tpi.m_amount;
-                            break;
-                    }
-                }
+                techPointGainForCaster = AbilityUtils.GetTechPointRewardForInteraction(
+                    payload.Ability,
+                    finalDamage > 0 ? AbilityInteractionType.Damage : AbilityInteractionType.Hit,
+                    payload.Hits == 1,
+                    barrier.Caster.GetTeam() == hitter.GetTeam(),
+                    barrier.Caster.GetTeam() != hitter.GetTeam());
             }
             return new ClientActorHitResultsBuilder()
-                .SetDamage(finalDamage, barrier.GetCenterPos(), false, empowered && !weakened, weakened && !empowered) // TODO apply weakened/empowered/energized/etc in builder
+                .SetDamage(finalDamage, barrier.GetCenterPos(), false, empowered && !weakened, weakened && !empowered) // TODO apply weakened/empowered/etc in builder
                 .SetHealing(finalHealing)
-                .SetTechPoints(response.m_techPoints, 0, techPointGainForCaster)  // TODO maybe response.m_techPoints is for caster too?
+                .SetTechPoints(response.m_techPoints, 0)
+                .SetTechPointsGainOnCaster(techPointGainForCaster)  // TODO maybe response.m_techPoints is for caster too?
                 .SetRevealTarget()
                 .SetCanBeReactedTo(false)
                 .Build();
@@ -301,7 +269,7 @@ namespace ArtemisServer.GameServer
         public BarrierDelegate OnExpire;
         public BarrierDelegate OnEnd;
 
-        public TechPointBarrierDelegate GetTechPointsForCaster;
+        public Ability Ability;
 
         public int EnemyHits;
         public int AllyHits;

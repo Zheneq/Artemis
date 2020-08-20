@@ -8,17 +8,26 @@ namespace ArtemisServer.GameServer
 {
     class Utils
     {
-        public static Dictionary<int, int> GetActorIndexToDeltaHP(Dictionary<ActorData, Dictionary<AbilityTooltipSymbol, int>> targetedActors)
+        public static Dictionary<int, int> GetActorIndexToDeltaHP(List<ClientResolutionAction> actions)
         {
             Dictionary<int, int> actorIndexToDeltaHP = new Dictionary<int, int>();
-            foreach (var targetedActor in targetedActors)
+            foreach (var action in actions)
             {
-                int actorIndex = targetedActor.Key.ActorIndex;
-                targetedActor.Value.TryGetValue(AbilityTooltipSymbol.Healing, out int healing);
-                targetedActor.Value.TryGetValue(AbilityTooltipSymbol.Damage, out int damage);
-                targetedActor.Value.TryGetValue(AbilityTooltipSymbol.Absorb, out int absorb);  // TODO: how does absorb count here? (does it count at all, does absorb from previous phase somehow affect calculations?)
-                int deltaHP = absorb + healing - damage;
-                actorIndexToDeltaHP.Add(actorIndex, deltaHP);
+                action.GetAllHitResults(out var actorHitResList, out var posHitResList);
+                foreach (var targetedActor in actorHitResList)
+                {
+                    int actorIndex = targetedActor.Key.ActorIndex;
+                    // TODO: how does absorb count here? (does it count at all, does absorb from previous phase somehow affect calculations?)
+                    int deltaHP = targetedActor.Value.Healing - targetedActor.Value.Damage;
+                    if (!actorIndexToDeltaHP.ContainsKey(actorIndex))
+                    {
+                        actorIndexToDeltaHP.Add(actorIndex, deltaHP);
+                    }
+                    else
+                    {
+                        actorIndexToDeltaHP[actorIndex] += deltaHP;
+                    }
+                }
             }
             return actorIndexToDeltaHP;
         }

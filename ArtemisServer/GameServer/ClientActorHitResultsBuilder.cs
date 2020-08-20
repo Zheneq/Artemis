@@ -67,14 +67,19 @@ namespace ArtemisServer.GameServer
             return this;
         }
 
-        public ClientActorHitResultsBuilder SetTechPoints(int finalTechPointsGain, int finalTechPointsLoss, int finalTechPointGainOnCaster)
+        public ClientActorHitResultsBuilder SetTechPoints(int finalTechPointsGain, int finalTechPointsLoss)
         {
             m_hasTechPointGain = finalTechPointsGain != 0;
             m_hasTechPointLoss = finalTechPointsLoss != 0;
-            m_hasTechPointGainOnCaster = finalTechPointGainOnCaster != 0;
 
             m_finalTechPointsGain = finalTechPointsGain;
             m_finalTechPointsLoss = finalTechPointsLoss;
+            return this;
+        }
+
+        public ClientActorHitResultsBuilder SetTechPointsGainOnCaster(int finalTechPointGainOnCaster)
+        {
+            m_hasTechPointGainOnCaster = finalTechPointGainOnCaster != 0;
             m_finalTechPointGainOnCaster = finalTechPointGainOnCaster;
             return this;
         }

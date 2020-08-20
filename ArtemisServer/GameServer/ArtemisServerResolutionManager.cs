@@ -195,7 +195,7 @@ namespace ArtemisServer.GameServer
 
             if (Phase < AbilityPriority.NumAbilityPriorities)
             {
-                Dictionary<int, int> actorIndexToDeltaHP = Utils.GetActorIndexToDeltaHP(TargetedActorsThisPhase);
+                Dictionary<int, int> actorIndexToDeltaHP = Utils.GetActorIndexToDeltaHP(ActionsThisPhase);
                 List<int> participants = new List<int>(actorIndexToDeltaHP.Keys);
 
                 foreach (var action in ActionsThisPhase)
@@ -212,7 +212,7 @@ namespace ArtemisServer.GameServer
                     Index = Phase,
                     ActorIndexToDeltaHP = actorIndexToDeltaHP,
                     ActorIndexToKnockback = new Dictionary<int, int>(), // TODO
-                    Participants = participants, // TODO: add other participants (knockback, energy change, etc)
+                    Participants = participants,
                     Animations = Animations
                 };
 

@@ -22,6 +22,9 @@ namespace ArtemisServer.GameServer.Abilities
 
         protected AbilityData.ActionType ActionType { get => m_abilityRequestData.m_actionType; }
 
+        protected virtual bool RevealCaster => true;
+        protected virtual bool RevealTarget => true;
+
         public AbilityResolver(ActorData actor, Ability ability, AbilityPriority priority, ActorTargeting.AbilityRequestData abilityRequestData)
         {
             m_caster = actor;
@@ -65,27 +68,26 @@ namespace ArtemisServer.GameServer.Abilities
                 Dictionary<ActorData, ClientActorHitResults> actorToHitResults = new Dictionary<ActorData, ClientActorHitResults>();
                 foreach (var targetedActor in TargetedActors)
                 {
+                    // NOTE: If you add something here (or in descendants), make sure that ArtemisServerResolutionManager.ApplyActions can process it
                     CurrentTargeterResolver.Targeter.GetActorContextVars().TryGetValue(targetedActor.Key, out var hitContext);
                     foreach (var symbol in targetedActor.Value)
                     {
-                        ClientActorHitResults hitResults;
+                        var hitResultsBuilder = new ClientActorHitResultsBuilder();
                         switch (symbol.Key)
                         {
-                            // NOTE: If you add something here (or in descendants), make sure that ArtemisServerResolutionManager.ApplyActions can process it
                             case AbilityTooltipSymbol.Damage:
                                 CurrentTargeterResolver.Targeter.IsActorInTargetRange(targetedActor.Key, out bool inCover);
-                                hitResults = new ClientActorHitResultsBuilder()
-                                    .SetDamage(symbol.Value, Vector3.zero, inCover, false, false)  // TODO
-                                    .SetRevealCaster()  // TODO
-                                    .SetRevealTarget()  // TODO
-                                    .Build();
+                                hitResultsBuilder
+                                    .SetDamage(symbol.Value, Vector3.zero, inCover, false, false);  // TODO
                                 Log.Info($"HitResults: damage: {symbol.Value}");
                                 break;
-                            default:
-                                hitResults = new ClientActorHitResultsBuilder().Build();
-                                break;
                         }
-                        actorToHitResults.Add(targetedActor.Key, hitResults);
+                        hitResultsBuilder
+                            .SetTechPointsGainOnCaster(GetEnergyGain())  // TODO Some abilities that casted on oneself use Energy Gain instead of Energy Gain On Caster. But do we have to do the same?
+                            .SetRevealCaster(RevealCaster)
+                            .SetRevealTarget(RevealTarget)
+                            .Build();
+                        actorToHitResults.Add(targetedActor.Key, hitResultsBuilder.Build());
                     }
                 }
 
@@ -216,7 +218,7 @@ namespace ArtemisServer.GameServer.Abilities
 
         protected virtual Dictionary<ActorData, int> MakeAnimActorToDeltaHP()
         {
-            Dictionary<int, int> actorIndexToDeltaHP = Utils.GetActorIndexToDeltaHP(TargetedActors);
+            Dictionary<int, int> actorIndexToDeltaHP = Utils.GetActorIndexToDeltaHP(Actions);
             Dictionary<ActorData, int> actorToDeltaHP = new Dictionary<ActorData, int>();
             foreach (var actorIndexAndDeltaHP in actorIndexToDeltaHP)
             {
@@ -227,6 +229,17 @@ namespace ArtemisServer.GameServer.Abilities
                 }
             }
             return actorToDeltaHP;
+        }
+
+        protected virtual int GetEnergyGain()
+        {
+            int baseGain = AbilityUtils.GetTechPointRewardForInteraction(m_ability, AbilityInteractionType.Cast, true);
+            return AbilityUtils.CalculateTechPointsForTargeter(m_caster, m_ability, baseGain);
+        }
+
+        protected virtual int GetEnergyCost()
+        {
+            return 0;
         }
 
         protected virtual void Make_000C_X_0014_Z(out List<byte> x, out List<byte> y)

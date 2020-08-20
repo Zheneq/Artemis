@@ -57,7 +57,7 @@ namespace ArtemisServer.GameServer.Abilities
                 {
                     payload.RemoveAtTurnEnd = true;
                 };
-            payload.GetTechPointsForCaster = barrier => Ability.GetBaseTechPointInteractions();
+            payload.Ability = m_ability;
             foreach (Vector3 facingDir in new List<Vector3>() { new Vector3(0, 0, 1), new Vector3(1, 0, 0) })
             {
                 var barrier = Utils.ConsBarrier(m_caster, data, m_targetPos, facingDir, seqSource, Ability.ModdedBarrierSequencePrefab());
