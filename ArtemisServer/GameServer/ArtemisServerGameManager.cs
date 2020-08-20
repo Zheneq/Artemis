@@ -39,6 +39,8 @@ namespace ArtemisServer.GameServer
             yield return new WaitForSeconds(5);
             GameFlow.Get().CallRpcSetMatchTime(0);
             GameFlowData.Get().Networkm_currentTurn = 0;
+
+            GameFlowData.Get().m_turnTime = 8;
             Log.Info("Done preparing for game");
         }
 
@@ -110,6 +112,32 @@ namespace ArtemisServer.GameServer
             SharedEffectBarrierManager.Get().UpdateTurn();
 
             Log.Info("TurnDecision");
+
+
+            var assm = ArtemisServerMovementManager.Get();
+            foreach (ActorData actor in GameFlowData.Get().GetActors())
+            {
+                if (actor.CurrentBoardSquare.x == 17 && actor.CurrentBoardSquare.y == 9)
+                {
+                    actor.m_maxHorizontalMovement = 8;
+                    assm.CmdSetSquare(actor.GetActorTurnSM(), 15, 9, false);
+                }
+                else if (actor.CurrentBoardSquare.x == 15 && actor.CurrentBoardSquare.y == 9)
+                {
+                    actor.m_maxHorizontalMovement = 8;
+                    assm.CmdSetSquare(actor.GetActorTurnSM(), 17, 9, false);
+                }
+                else if (actor.CurrentBoardSquare.x == 18 && actor.CurrentBoardSquare.y == 9)
+                {
+                    actor.m_maxHorizontalMovement = 8;
+                    assm.CmdSetSquare(actor.GetActorTurnSM(), 20, 7, false);
+                    assm.CmdSetSquare(actor.GetActorTurnSM(), 18, 9, true);
+                }
+                else
+                {
+                    actor.GetActorStatus().AddStatus(StatusType.Empowered, 10);
+                }
+            }
 
             while (GameFlowData.Get().GetTimeRemainingInDecision() > 0)
             {
