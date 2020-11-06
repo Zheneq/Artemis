@@ -17,6 +17,7 @@ namespace ArtemisServer.GameServer
         private List<ClientResolutionAction> ActionsThisPhase;
         private List<ActorAnimation> Animations;
         private List<Barrier> Barriers;
+        private Dictionary<ActorData, BoardSquarePathInfo> Dashes;
         internal AbilityPriority Phase { get; private set; }
         internal Turn Turn;
 
@@ -53,6 +54,7 @@ namespace ArtemisServer.GameServer
             ActionsThisPhase = new List<ClientResolutionAction>();
             Animations = new List<ActorAnimation>();
             Barriers = new List<Barrier>();
+            Dashes = new Dictionary<ActorData, BoardSquarePathInfo>();
 
             var sab = Artemis.ArtemisServer.Get().SharedActionBuffer;
 
@@ -87,8 +89,6 @@ namespace ArtemisServer.GameServer
                 Utils.Add(TargetedActorsThisTurn, TargetedActorsThisPhase);
             }
 
-            sab.Networkm_abilityPhase = Phase; // TODO check this
-
             UpdateTheatricsPhase();
 
             if (lastPhase)
@@ -101,6 +101,16 @@ namespace ArtemisServer.GameServer
                 return false;
             }
 
+            if (Phase == AbilityPriority.Evasion)
+            {
+                ArtemisServerMovementManager.Get().ResolveDashes(Dashes);
+            }
+
+            if (Phase == AbilityPriority.Evasion)
+            {
+                ArtemisServerMovementManager.Get().SendDashes(Dashes);
+            }
+
             SendToAll((short)MyMsgType.StartResolutionPhase, new StartResolutionPhase()
             {
                 CurrentTurnIndex = GameFlowData.Get().CurrentTurn,
@@ -108,13 +118,15 @@ namespace ArtemisServer.GameServer
                 NumResolutionActionsThisPhase = ActionsThisPhase.Count
             });
 
-            SendActions();
-
             foreach (Barrier barrier in Barriers)
             {
                 BarrierManager.Get().AddBarrier(barrier, true, out var _);
                 // TODO AddBarrier updates ability blocking. Should we update vision/movement/cover?
             }
+
+            SendActions();
+
+            sab.Networkm_abilityPhase = Phase;
 
             // TODO process ClientResolutionManager.SendResolutionPhaseCompleted
             return true;
@@ -164,6 +176,20 @@ namespace ArtemisServer.GameServer
                 Animations.AddRange(resolver.Animations);
                 Utils.Add(TargetedActorsThisPhase, resolver.TargetedActors);
                 Barriers.AddRange(resolver.Barriers);
+
+                if (priority == AbilityPriority.Evasion && resolver.Dash != null)
+                {
+                    Dashes.Add(actor, resolver.Dash);
+                }
+
+                var e = ability.GetModdedEffectForEnemies();
+                var a = ability.GetModdedEffectForAllies();
+                var s = ability.GetModdedEffectForSelf();
+                Log.Info($"\n" +
+                    $"{ability.m_abilityName}: " +
+                    $"\n\tEffect for enemies ({e?.m_applyEffect}):\n{DefaultJsonSerializer.Serialize(e?.m_effectData)}" +
+                    $"\n\tEffect for allies ({a?.m_applyEffect}):\n{DefaultJsonSerializer.Serialize(a?.m_effectData)}" +
+                    $"\n\tEffect for self ({s?.m_applyEffect}):\n{DefaultJsonSerializer.Serialize(s?.m_effectData)}");
             }
         }
 
@@ -171,6 +197,7 @@ namespace ArtemisServer.GameServer
         {
             TheatricsPendingClients.Clear();
 
+            // TODO Fix dash theatrics
             foreach (long clientId in TheatricsManager.Get().m_playerConnectionIdsInUpdatePhase)
             {
                 TheatricsPendingClients.Add(clientId);
@@ -204,6 +231,22 @@ namespace ArtemisServer.GameServer
                     if (!participants.Contains(actorIndex))
                     {
                         participants.Add(actorIndex);
+                    }
+                }
+                foreach (var anim in Animations)
+                {
+                    foreach (var actor in anim.HitActorsToDeltaHP)
+                    {
+                        int actorIndex = actor.Key.ActorIndex;
+                        if (!participants.Contains(actorIndex))
+                        {
+                            participants.Add(actorIndex);
+                            if (actor.Value != 0)
+                            {
+                                Log.Warning($"Found non-zero HitActorToDeltaHP (actorIndex={actorIndex} delta={actor.Value}) not present in actorIndexToDeltaHP!");
+                                actorIndexToDeltaHP.Add(actorIndex, 0);
+                            }
+                        }
                     }
                 }
 
@@ -252,6 +295,17 @@ namespace ArtemisServer.GameServer
             SendActions();
         }
 
+        public void SetDashMovementActions(List<ClientResolutionAction> actions)
+        {
+            if (Phase != AbilityPriority.Evasion)
+            {
+                Log.Error($"SetDashMovementActions called in {Phase} phase! Ignoring");
+                return;
+            }
+
+            ActionsThisPhase.AddRange(actions);
+        }
+
         public void OnClientResolutionPhaseCompleted(NetworkConnection conn, GameMessageManager.ClientResolutionPhaseCompleted msg)
         {
             Player player = GameFlow.Get().GetPlayerFromConnectionId(conn.connectionId);
@@ -276,6 +330,11 @@ namespace ArtemisServer.GameServer
             {
                 Log.Info("AbilityResolver_TrapWire");
                 return new AbilityResolver_TrapWire(actor, ability, priority, abilityRequestData);
+            }
+            else if (ability.m_abilityName == "Backup Plan")
+            {
+                Log.Info("AbilityResolver_EvasionRoll");
+                return new AbilityResolver_EvasionRoll(actor, ability, priority, abilityRequestData);
             }
             return new AbilityResolver(actor, ability, priority, abilityRequestData);
         }

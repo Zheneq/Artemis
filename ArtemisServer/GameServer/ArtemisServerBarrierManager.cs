@@ -60,20 +60,18 @@ namespace ArtemisServer.GameServer
             }
         }
 
-        public List<ClientResolutionAction> OnMovement(Dictionary<int, BoardSquarePathInfo> paths)
+        public List<ClientResolutionAction> OnMovement(Dictionary<ActorData, BoardSquarePathInfo> paths)
         {
             // sort
-            Dictionary<int, ActorData> actorsByIndex = Utils.GetActorByIndex();
             List<MovementNode> nodes = new List<MovementNode>();
             foreach (var p in paths)
             {
                 for (var n = p.Value; n != null; n = n.next)
                 {
-                    actorsByIndex.TryGetValue(p.Key, out var actor);
                     nodes.Add(new MovementNode
                     {
                         pathInfo = n,
-                        actor = actor
+                        actor = p.Key
                     });
                 }
             }

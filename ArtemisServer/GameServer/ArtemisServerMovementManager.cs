@@ -132,24 +132,13 @@ namespace ArtemisServer.GameServer
 
         public void ResolveMovement()
         {
-            Dictionary<int, BoardSquarePathInfo> paths = new Dictionary<int, BoardSquarePathInfo>();
+            Dictionary<ActorData, BoardSquarePathInfo> paths = new Dictionary<ActorData, BoardSquarePathInfo>();
             foreach (ActorData actor in GameFlowData.Get().GetActors())
             {
-                paths.Add(actor.ActorIndex, ResolveMovement(actor));
+                paths.Add(actor, ResolveMovement(actor));
             }
 
-            Dictionary<int, BoardSquarePathInfo> nodes = new Dictionary<int, BoardSquarePathInfo>(paths);
-            bool finished = false;
-            for (float time = 0; !finished; time += RESOLUTION_STEP)
-            {
-                if (!ResolveSubstep(nodes, time, out finished))
-                {
-                    // TODO optimize
-                    time = -RESOLUTION_STEP;
-                    nodes = new Dictionary<int, BoardSquarePathInfo>(paths);
-                    Log.Info("Restarting movement resolution loop");
-                }
-            }
+            ResolveMovementImpl(paths);
 
             var movementActions = ArtemisServerBarrierManager.Get().OnMovement(paths);
             ArtemisServerResolutionManager.Get().SendMovementActions(movementActions);
@@ -158,7 +147,7 @@ namespace ArtemisServer.GameServer
 
             foreach (ActorData actor in GameFlowData.Get().GetActors())
             {
-                BoardSquarePathInfo start = paths[actor.ActorIndex];
+                BoardSquarePathInfo start = paths[actor];
                 BoardSquarePathInfo end = start;
                 while (end.next != null) end = end.next;
 
@@ -184,11 +173,70 @@ namespace ArtemisServer.GameServer
             Log.Info("Movement resolved");
         }
 
-        private bool ResolveSubstep(Dictionary<int, BoardSquarePathInfo> nodes, float time, out bool finished)
+        public void ResolveDashes(Dictionary<ActorData, BoardSquarePathInfo> dashes)
+        {
+            ResolveMovementImpl(dashes);
+
+            var movementActions = ArtemisServerBarrierManager.Get().OnMovement(dashes);
+            ArtemisServerResolutionManager.Get().SetDashMovementActions(movementActions);
+            Log.Info("Dashes resolved");
+        }
+
+        public void SendDashes(Dictionary<ActorData, BoardSquarePathInfo> dashes)
+        {
+            // TODO ClientMovementManager.MsgServerMovementStarting
+
+            foreach (var actorAndDash in dashes)
+            {
+                ActorData actor = actorAndDash.Key;
+                BoardSquarePathInfo start = actorAndDash.Value;
+                BoardSquarePathInfo end = start;
+                while (end.next != null) end = end.next;
+
+                ActorTeamSensitiveData atsd = actor.TeamSensitiveData_authority;
+
+                // TODO GetPathEndpoint everywhere
+
+                // TODO movement camera bounds
+                actor.MoveFromBoardSquare = end.square;
+                actor.InitialMoveStartSquare = end.square;  // TODO should it be here?
+                actor.ServerLastKnownPosSquare = end.square;
+
+                GridPos startPos = start.square.GetGridPosition();
+                startPos.height += 1;
+
+                atsd.CallRpcMovement(
+                     GameEventManager.EventType.TheatricsEvasionMoveStart,
+                     GridPosProp.FromGridPos(startPos),
+                     GridPosProp.FromGridPos(end.square.GetGridPosition()),
+                     MovementUtils.SerializePath(start),
+                     ActorData.MovementType.Charge,
+                     false,
+                     false);
+            }
+        }
+
+        private void ResolveMovementImpl(Dictionary<ActorData, BoardSquarePathInfo> paths)
+        {
+            Dictionary<ActorData, BoardSquarePathInfo> nodes = new Dictionary<ActorData, BoardSquarePathInfo>(paths);
+            bool finished = false;
+            for (float time = 0; !finished; time += RESOLUTION_STEP)
+            {
+                if (!ResolveSubstep(nodes, time, out finished))
+                {
+                    // TODO optimize
+                    time = -RESOLUTION_STEP;
+                    nodes = new Dictionary<ActorData, BoardSquarePathInfo>(paths);
+                    Log.Info("Restarting movement resolution loop");
+                }
+            }
+        }
+
+        private bool ResolveSubstep(Dictionary<ActorData, BoardSquarePathInfo> nodes, float time, out bool finished)
         {
             // Advancing
             finished = true;
-            foreach (var node in new Dictionary<int, BoardSquarePathInfo>(nodes))
+            foreach (var node in new Dictionary<ActorData, BoardSquarePathInfo>(nodes))
             {
                 if (node.Value.next != null)
                 {
@@ -201,13 +249,13 @@ namespace ArtemisServer.GameServer
             }
 
             // Grouping by square
-            var nodesBySquare = new Dictionary<GridPos, List<KeyValuePair<int, BoardSquarePathInfo>>>();
+            var nodesBySquare = new Dictionary<GridPos, List<KeyValuePair<ActorData, BoardSquarePathInfo>>>();
             foreach (var node in nodes)
             {
                 GridPos square = node.Value.square.GetGridPosition();
                 if (!nodesBySquare.ContainsKey(square))
                 {
-                    nodesBySquare[square] = new List<KeyValuePair<int, BoardSquarePathInfo>> { node };
+                    nodesBySquare[square] = new List<KeyValuePair<ActorData, BoardSquarePathInfo>> { node };
                 }
                 else
                 {
@@ -219,10 +267,10 @@ namespace ArtemisServer.GameServer
             foreach (var node in nodesBySquare)
             {
                 GridPos pos = node.Key;
-                List<KeyValuePair<int, BoardSquarePathInfo>> pathInfos = node.Value;
+                List<KeyValuePair<ActorData, BoardSquarePathInfo>> pathInfos = node.Value;
                 if (pathInfos.Count > 1)
                 {
-                    pathInfos.Sort(delegate (KeyValuePair<int, BoardSquarePathInfo> a, KeyValuePair<int, BoardSquarePathInfo> b)
+                    pathInfos.Sort(delegate (KeyValuePair<ActorData, BoardSquarePathInfo> a, KeyValuePair<ActorData, BoardSquarePathInfo> b)
                     {
                         return a.Value.moveCost.CompareTo(b.Value.moveCost);
                     });
@@ -245,9 +293,9 @@ namespace ArtemisServer.GameServer
                                 if (mutualClash)
                                 {
                                     var occupiedSquares = new HashSet<GridPos>(nodesBySquare.Keys);
-                                    ActorData aActor = Utils.GetActorByIndex(pathInfos[i].Key);
+                                    ActorData aActor = pathInfos[i].Key;
                                     a.next = BackOff(aActor, a, occupiedSquares); // TODO choose winner randomly? a and b can have idential backoff, a has an advantage currently
-                                    ActorData bActor = Utils.GetActorByIndex(pathInfos[j].Key);
+                                    ActorData bActor = pathInfos[j].Key;
                                     b.next = BackOff(bActor, b, occupiedSquares);
                                 }
                                 else

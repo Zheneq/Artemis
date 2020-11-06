@@ -71,6 +71,7 @@
     <Compile Include="GameMessageManager.cs" />
     <Compile Include="GameServer\Abilities\AbilityResolver.cs" />
     <Compile Include="GameServer\Abilities\AbilityResolver_TrapWire.cs" />
+    <Compile Include="GameServer\Abilities\AbilityResolver_EvasionRoll.cs" />
     <Compile Include="GameServer\Abilities\AbilityResolver_TrickShot.cs" />
     <Compile Include="GameServer\ArtemisServerBarrierManager.cs" />
     <Compile Include="GameServer\ArtemisServerGameManager.cs" />

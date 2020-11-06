@@ -17,6 +17,7 @@ namespace ArtemisServer.GameServer.Abilities
         public List<ClientResolutionAction> Actions;
         public List<ActorAnimation> Animations;
         public List<Barrier> Barriers;
+        public BoardSquarePathInfo Dash;
 
         protected TargeterResolver CurrentTargeterResolver { get; private set; }
 
@@ -95,6 +96,7 @@ namespace ArtemisServer.GameServer.Abilities
                 MakeBarriers(seqSource);
                 Actions.Add(MakeResolutionAction(actorToHitResults, seqSource));
                 MakeAnimations(seqSource);
+                Dash = MakeDash();
             }
             CurrentTargeterResolver = null;
         }
@@ -126,6 +128,11 @@ namespace ArtemisServer.GameServer.Abilities
         protected virtual void MakeBarriers(SequenceSource seqSource)
         {
 
+        }
+
+        protected virtual BoardSquarePathInfo MakeDash()
+        {
+            return null;
         }
 
         protected virtual ClientResolutionAction MakeResolutionAction(
@@ -207,6 +214,8 @@ namespace ArtemisServer.GameServer.Abilities
 
         protected virtual Bounds MakeBounds()
         {
+            // TODO check m_ability.CalcBoundsOfInterestForCamera
+
             Bounds bounds = new Bounds(m_caster.CurrentBoardSquare.GetWorldPosition(), new Vector3(4, 3, 4));
             foreach (var actorTarget in m_ability.Targeter.GetActorsInRange())
             {
@@ -234,12 +243,7 @@ namespace ArtemisServer.GameServer.Abilities
         protected virtual int GetEnergyGain()
         {
             int baseGain = AbilityUtils.GetTechPointRewardForInteraction(m_ability, AbilityInteractionType.Cast, true);
-            return AbilityUtils.CalculateTechPointsForTargeter(m_caster, m_ability, baseGain);
-        }
-
-        protected virtual int GetEnergyCost()
-        {
-            return 0;
+            return AbilityUtils.CalculateTechPointsForTargeter(m_caster, m_ability, baseGain) - m_ability.GetModdedCost();
         }
 
         protected virtual void Make_000C_X_0014_Z(out List<byte> x, out List<byte> y)
